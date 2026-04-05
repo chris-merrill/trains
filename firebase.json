@@ -1,0 +1,17 @@
+{
+  "hosting": {
+    "public": ".",
+    "ignore": ["firebase.json", ".firebase", ".firebaserc", "**/.*", "**/node_modules/**", "functions/**", "gtfs_raw/**", "gtfs.zip", "gtfs_data.json", "icon.svg"],
+    "rewrites": [
+      { "source": "/gtfs_data.json", "function": { "functionId": "getSchedule", "region": "us-central1" } }
+    ]
+  },
+  "functions": [
+    {
+      "source": "functions",
+      "codebase": "default",
+      "runtime": "nodejs20",
+      "ignore": ["node_modules", ".git", "*.log"]
+    }
+  ]
+}

@@ -1,0 +1,8 @@
+node_modules/
+.firebase/
+gtfs_raw/
+gtfs.zip
+*.log
+.DS_Store
+.env
+.claude/
