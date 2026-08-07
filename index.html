@@ -191,6 +191,48 @@ tailwind.config = {
   function pickFeed(y,m,d){
     return coveringFeed(dstr(y,m,d))||GTFS;
   }
+  // Opt-in only: during a coverage gap the user can choose to read the
+  // nearest published timetable as an approximation. Never on by default —
+  // these are guessed times, not UTA's.
+  var APPROX_ON=false;
+  try{APPROX_ON=localStorage.getItem('transit.approx')==='1'}catch(e){}
+  function setApprox(v){
+    APPROX_ON=v;
+    try{localStorage.setItem('transit.approx',v?'1':'0')}catch(e){}
+    update();
+  }
+  function dsToDate(ds){
+    return new Date(+ds.slice(0,4),+ds.slice(4,6)-1,+ds.slice(6,8));
+  }
+  function dayGap(a,b){
+    return Math.round((dsToDate(b)-dsToDate(a))/86400000);
+  }
+  // Distance in real days — YYYYMMDD subtraction lies across month ends.
+  function nearestFeed(ds){
+    var best=null,bestD=Infinity;
+    allFeeds().forEach(function(f){
+      var dist=f.feedStart>ds?dayGap(ds,f.feedStart):(f.feedEnd<ds?dayGap(f.feedEnd,ds):0);
+      if(dist<bestD){bestD=dist;best=f}
+    });
+    return best;
+  }
+  // Times only mean anything if the weekday matches, so map the requested
+  // date onto the first same-weekday date inside the feed's valid range.
+  function proxyDate(ds,feed){
+    var want=dsToDate(ds).getDay(),c=dsToDate(feed.feedStart);
+    for(var i=0;i<7&&c.getDay()!==want;i++) c.setDate(c.getDate()+1);
+    return dstr(c.getFullYear(),c.getMonth()+1,c.getDate());
+  }
+  // null => nothing usable for this date; approx=true => times are estimated.
+  function resolveFeed(y,m,d){
+    var ds=dstr(y,m,d),f=coveringFeed(ds);
+    if(f) return {feed:f,ds:ds,approx:false};
+    if(APPROX_ON){
+      var n=nearestFeed(ds);
+      if(n) return {feed:n,ds:proxyDate(ds,n),approx:true,source:n};
+    }
+    return null;
+  }
 
   function utahNow(){
     return new Date(new Date().toLocaleString('en-US',{timeZone:'America/Denver'}));
@@ -249,8 +291,10 @@ tailwind.config = {
   var REST_EXPANDED=false;
 
   function getActiveServices(y,m,d,feed){
-    var ds=String(y)+String(m).padStart(2,'0')+String(d).padStart(2,'0');
-    var dow=DOW[new Date(y,m-1,d).getDay()];
+    return getActiveServicesDs(dstr(y,m,d),feed);
+  }
+  function getActiveServicesDs(ds,feed){
+    var dow=DOW[dsToDate(ds).getDay()];
     var active=new Set();
     feed.calendar.forEach(function(c){
       if(c.start_date<=ds&&c.end_date>=ds&&c[dow]==='1') active.add(c.service_id);
@@ -284,8 +328,10 @@ tailwind.config = {
 
   function getConnections(y,m,d,dirKey){
     var dir=DIRECTIONS[dirKey||DIRECTION];
-    var feed=pickFeed(y,m,d);
-    var services=getActiveServices(y,m,d,feed);
+    var res=resolveFeed(y,m,d);
+    if(!res) return [];
+    var feed=res.feed;
+    var services=getActiveServicesDs(res.ds,feed);
     var stByTrip={};
     feed.stopTimes.forEach(function(st){
       if(!stByTrip[st[0]]) stByTrip[st[0]]=[];
@@ -337,17 +383,34 @@ tailwind.config = {
 
   // Distinct from renderEmpty: "we have no timetable for this date at all" is
   // a different situation from "we looked and there are no trains".
-  function renderGap(msg,nextStart){
+  function renderGap(msg,nextStart,near){
     var box=mkEl('div','px-4 py-10 text-center text-sm font-mono rounded-xl border text-amber-400/80 bg-amber-500/[0.03] border-amber-500/20',[msg]);
+    var row=mkEl('div','mt-4 flex flex-wrap gap-2 justify-center');
     if(nextStart){
-      var btn=mkEl('button','mt-4 mx-auto block px-3 py-1.5 rounded-lg border border-amber-500/30 text-amber-300 text-xs hover:bg-amber-500/10 active:scale-95 transition-colors',['Jump to '+fmtDate(nextStart)]);
+      var btn=mkEl('button','px-3 py-1.5 rounded-lg border border-amber-500/30 text-amber-300 text-xs hover:bg-amber-500/10 active:scale-95 transition-colors',['Jump to '+fmtDate(nextStart)]);
       btn.addEventListener('click',function(){
         document.getElementById('dateInput').value=
           nextStart.slice(0,4)+'-'+nextStart.slice(4,6)+'-'+nextStart.slice(6,8);
         update();
       });
-      box.appendChild(btn);
+      row.appendChild(btn);
     }
+    if(near){
+      var alt=mkEl('button','px-3 py-1.5 rounded-lg border border-gray-600/50 text-gray-300 text-xs hover:bg-gray-500/10 active:scale-95 transition-colors',['Estimate from '+fmtDate(near.feedStart)+' timetable']);
+      alt.addEventListener('click',function(){setApprox(true)});
+      row.appendChild(alt);
+    }
+    if(row.childNodes.length) box.appendChild(row);
+    return box;
+  }
+
+  function renderApproxBanner(res){
+    var box=mkEl('div','mb-3 px-3 py-2.5 rounded-xl border text-[11px] font-mono leading-relaxed text-amber-300/90 bg-amber-500/[0.06] border-amber-500/30');
+    box.appendChild(txt('Estimated times — UTA has not published a schedule for this date. '
+      +'These come from the '+fmtDate(res.source.feedStart)+' timetable for the same weekday. Verify before you rely on them.'));
+    var off=mkEl('button','ml-2 underline underline-offset-2 hover:text-amber-200',['Hide estimates']);
+    off.addEventListener('click',function(){setApprox(false)});
+    box.appendChild(off);
     return box;
   }
 
@@ -448,13 +511,15 @@ tailwind.config = {
     clearEl(board);
     updateControlsPill();
 
-    if(!coveringFeed(dstr(y,m,d))){
-      var nx=nextCoveredDate(dstr(y,m,d));
+    var res=resolveFeed(y,m,d);
+    if(!res){
+      var ds0=dstr(y,m,d),nx=nextCoveredDate(ds0);
       var gmsg='UTA has not published a schedule covering this date.';
       if(nx) gmsg+=' Timetables resume '+fmtDate(nx)+'.';
-      board.appendChild(renderGap(gmsg,nx));
+      board.appendChild(renderGap(gmsg,nx,nearestFeed(ds0)));
       return;
     }
+    if(res.approx) board.appendChild(renderApproxBanner(res));
 
     if(connections.length===0){
       var dow=new Date(y,m-1,d).getDay();
