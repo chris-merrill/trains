@@ -1,0 +1,59 @@
+name: Capture production
+# One-shot: snapshots the deployed site at transit-cm.web.app into the
+# 'production-capture' branch so the repo can be reconciled with the newer
+# production source. Triggers once when this file lands on main; safe to
+# re-run via dispatch. Delete after reconciliation.
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/capture-production.yml']
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch production site
+        run: |
+          set -e
+          BASE="https://transit-cm.web.app"
+          OUT=prod
+          mkdir -p "$OUT"
+          fetch() { # path -> file (skip 404s)
+            local p="$1" f="$OUT/${1#/}"
+            [ "$p" = "/" ] && f="$OUT/index.html"
+            mkdir -p "$(dirname "$f")"
+            code=$(curl -sS -L -o "$f" -w '%{http_code}' "$BASE$p") || return 0
+            if [ "$code" != "200" ]; then rm -f "$f"; echo "skip $p ($code)"; else echo "got  $p ($(wc -c < "$f") bytes)"; fi
+          }
+          # Known/likely paths
+          for p in / /manifest.json /apple-touch-icon.png /timetable.html /gtfs_data.json /icon.svg; do fetch "$p"; done
+          # Discover same-origin refs from every captured HTML file (two passes
+          # so pages linked from pages are picked up too)
+          for pass in 1 2; do
+            for html in "$OUT"/*.html; do
+              [ -f "$html" ] || continue
+              grep -oE '(href|src)="/[A-Za-z0-9_./-]+"' "$html" | sed -E 's/^(href|src)="//; s/"$//' | sort -u | while read -r p; do
+                case "$p" in /__/*) continue;; esac
+                f="$OUT/${p#/}"
+                [ -f "$f" ] || fetch "$p"
+              done
+            done
+          done
+          ls -laR "$OUT"
+      - name: Push capture branch
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout --orphan production-capture
+          git rm -rf --quiet . || true
+          mv prod/* .
+          rmdir prod
+          git add -A
+          git commit -m "Snapshot of deployed transit-cm.web.app ($(date -u +%Y-%m-%dT%H:%M:%SZ))"
+          git push -f origin production-capture
