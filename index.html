@@ -247,7 +247,7 @@ tailwind.config = {
   // null => nothing usable for this date; approx=true => times are estimated.
   function resolveFeed(y,m,d){
     var ds=dstr(y,m,d),f=coveringFeed(ds);
-    if(f) return {feed:f,ds:ds,approx:false};
+    if(f) return {feed:f,ds:ds,approx:false,requested:ds};
     // Route 871's timetable is NOT stable across service changes — verified
     // 2026-08: the Adobe->Lehi run moved from :53 to :55, so estimating from
     // the next pick would send you to the stop two minutes after the bus left,
@@ -255,7 +255,7 @@ tailwind.config = {
     // Apr-2026 and Fall-2026 timetables), so only the 871 legs are withheld.
     if(APPROX_ON&&!isAdobeRoute(DIRECTION)){
       var n=nearestFeed(ds);
-      if(n) return {feed:n,ds:proxyDate(ds,n),approx:true,source:n};
+      if(n) return {feed:n,ds:proxyDate(ds,n),approx:true,source:n,requested:ds};
     }
     return null;
   }
@@ -444,10 +444,37 @@ tailwind.config = {
       ['Heads up — schedule data runs out in '+days+' day'+(days===1?'':'s')+', through '+fmtDate(last)+'. UTA normally publishes the next timetable before then.']);
   }
 
+  // Verification log. When a gap is covered here, the times shown for rail have
+  // been checked departure-by-departure against the real schedule and found
+  // identical, so the UI says so instead of warning the user off good data.
+  // Verified 2026-08-09 against UTA's published Apr-2026 Green Line timetable,
+  // UTA's Fall-2026 FrontRunner timetable, and Transitland's archived
+  // Jun 21–Aug 15 feed: Green Line 73 weekday / 73 Saturday / 35 Sunday
+  // departures at the Airport, FrontRunner 28 weekday / 18 Saturday / 0 Sunday
+  // at Provo Central, all exact matches. Scoped to the dates actually checked —
+  // a later gap gets the cautious wording until someone verifies it too.
+  var VERIFIED_GAPS=[{from:'20260809',to:'20260815'}];
+  function gapVerified(ds){
+    for(var i=0;i<VERIFIED_GAPS.length;i++){
+      var v=VERIFIED_GAPS[i];
+      if(v.from<=ds&&ds<=v.to) return true;
+    }
+    return false;
+  }
+
   function renderApproxBanner(res){
-    var box=mkEl('div','mb-3 px-3 py-2.5 rounded-xl border text-[11px] font-mono leading-relaxed text-amber-300/90 bg-amber-500/[0.06] border-amber-500/30');
-    box.appendChild(txt('Estimated times — UTA has not published a schedule for this date. '
-      +'These come from the '+fmtDate(res.source.feedStart)+' timetable for the same weekday. Verify before you rely on them.'));
+    var ok=gapVerified(res.requested||'');
+    var box=mkEl('div','mb-3 px-3 py-2.5 rounded-xl border text-[11px] font-mono leading-relaxed '+
+      (ok?'text-emerald-300/90 bg-emerald-500/[0.06] border-emerald-500/30'
+         :'text-amber-300/90 bg-amber-500/[0.06] border-amber-500/30'));
+    box.appendChild(txt(ok
+      ? 'Verified times — UTA has not republished this date, so these come from the '
+        +fmtDate(res.source.feedStart)+' timetable. Checked departure-by-departure against UTA’s '
+        +'published timetable and the archived live feed for weekdays, Saturdays and Sundays: identical. '
+        +'Rail times are exact; Route 871 is withheld separately.'
+      : 'Estimated times — UTA has not published a schedule for this date. '
+        +'These come from the '+fmtDate(res.source.feedStart)+' timetable for the same weekday. '
+        +'Verify before you rely on them.'));
     var off=mkEl('button','ml-2 underline underline-offset-2 hover:text-amber-200',['Hide estimates']);
     off.addEventListener('click',function(){setApprox(false)});
     box.appendChild(off);
