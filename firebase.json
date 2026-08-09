@@ -1,7 +1,7 @@
 {
   "hosting": {
     "public": ".",
-    "ignore": ["firebase.json", ".firebase", ".firebaserc", "**/.*", "**/node_modules/**", "functions/**", "scripts/**", "gtfs_raw/**", "gtfs.zip", "icon.svg"],
+    "ignore": ["firebase.json", ".firebase", ".firebaserc", "**/.*", "**/node_modules/**", "functions/**", "scripts/**", "gtfs_raw/**", "gtfs.zip", "gtfs_data.json", "icon.svg"],
     "rewrites": [
       { "source": "/gtfs_data.json", "function": { "functionId": "getSchedule", "region": "us-central1" } }
     ],
@@ -17,10 +17,6 @@
       {
         "source": "/timetable.html",
         "headers": [{ "key": "Cache-Control", "value": "no-cache, max-age=0, must-revalidate" }]
-      },
-      {
-        "source": "/gtfs_data.json",
-        "headers": [{ "key": "Cache-Control", "value": "public, max-age=300, must-revalidate" }]
       }
     ]
   },
