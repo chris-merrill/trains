@@ -240,7 +240,12 @@ tailwind.config = {
   function resolveFeed(y,m,d){
     var ds=dstr(y,m,d),f=coveringFeed(ds);
     if(f) return {feed:f,ds:ds,approx:false};
-    if(APPROX_ON){
+    // Route 871's timetable is NOT stable across service changes — verified
+    // 2026-08: the Adobe->Lehi run moved from :53 to :55, so estimating from
+    // the next pick would send you to the stop two minutes after the bus left,
+    // on an hourly route. Rail estimates are exact (checked against UTA's own
+    // Apr-2026 and Fall-2026 timetables), so only the 871 legs are withheld.
+    if(APPROX_ON&&!isAdobeRoute(DIRECTION)){
       var n=nearestFeed(ds);
       if(n) return {feed:n,ds:proxyDate(ds,n),approx:true,source:n};
     }
@@ -546,7 +551,11 @@ tailwind.config = {
       var ds0=dstr(y,m,d),nx=nextCoveredDate(ds0);
       var gmsg='UTA has not published a schedule covering this date.';
       if(nx) gmsg+=' Timetables resume '+fmtDate(nx)+'.';
-      board.appendChild(renderGap(gmsg,nx,nearestFeed(ds0)));
+      if(APPROX_ON&&isAdobeRoute(DIRECTION))
+        gmsg='Route 871’s timetable changes on '+fmtDate(nx||'')+
+             ', so estimates would be wrong by a few minutes on an hourly bus. '+
+             'Estimates stay off for this route — check the UTA app for today’s bus times.';
+      board.appendChild(renderGap(gmsg,nx,APPROX_ON&&isAdobeRoute(DIRECTION)?null:nearestFeed(ds0)));
       return;
     }
     if(res.approx) board.appendChild(renderApproxBanner(res));
