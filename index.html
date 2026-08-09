@@ -207,8 +207,16 @@ tailwind.config = {
   // Opt-in only: during a coverage gap the user can choose to read the
   // nearest published timetable as an approximation. Never on by default —
   // these are guessed times, not UTA's.
-  var APPROX_ON=false;
-  try{APPROX_ON=localStorage.getItem('transit.approx')==='1'}catch(e){}
+  // ON by default during a coverage gap. Rail estimates are verified exact
+  // against UTA's own Apr-2026 and Fall-2026 timetables and Transitland's
+  // archive, and the one route where estimating is unsafe (871) is refused
+  // outright in resolveFeed — so a blank board helps nobody. An explicit
+  // "Hide estimates" is still remembered.
+  var APPROX_ON=true;
+  try{
+    var _ap=localStorage.getItem('transit.approx');
+    if(_ap!==null) APPROX_ON=(_ap==='1');
+  }catch(e){}
   function setApprox(v){
     APPROX_ON=v;
     try{localStorage.setItem('transit.approx',v?'1':'0')}catch(e){}
