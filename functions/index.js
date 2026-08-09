@@ -12,10 +12,14 @@ const BUCKET_FILE = 'gtfs_data.json';
 // UTA recently blanked route_short_name for these routes but the
 // route_long_name and route_id have been stable. Match by long name first,
 // fall back to the known route_id.
+// `required: false` routes are allowed to vanish from the feed without
+// failing the whole refresh — UTA actively churns route naming (they have
+// been blanking route_short_name and rebranding BRT lines), and losing the
+// Lehi connector must not also freeze the Airport/Provo rail data.
 const TARGET_ROUTES = {
-  '704': { longName: 'Green Line', fallbackId: '39020' },
-  '750': { longName: 'FrontRunner', fallbackId: '41065' },
-  '871': { longName: 'Tech Corridor Rail Connector', fallbackId: '2368' }
+  '704': { longName: 'Green Line', fallbackId: '39020', required: true },
+  '750': { longName: 'FrontRunner', fallbackId: '41065', required: true },
+  '871': { longName: 'Tech Corridor Rail Connector', fallbackId: '2368', required: false }
 };
 
 // Stop IDs were stable across prior UTA feeds; if UTA renumbers, the
@@ -61,8 +65,16 @@ async function buildGTFSData() {
     const match = byName || byId;
     if (match) routeIds[key] = match.route_id;
   }
-  if (!routeIds['704'] || !routeIds['750'] || !routeIds['871']) {
-    throw new Error('Target routes missing from feed: ' + JSON.stringify(routeIds));
+  const missingRequired = Object.keys(TARGET_ROUTES)
+    .filter(k => TARGET_ROUTES[k].required && !routeIds[k]);
+  if (missingRequired.length) {
+    throw new Error('Required routes missing from feed: ' + missingRequired.join(', ') +
+      ' (resolved: ' + JSON.stringify(routeIds) + ')');
+  }
+  const missingOptional = Object.keys(TARGET_ROUTES)
+    .filter(k => !TARGET_ROUTES[k].required && !routeIds[k]);
+  if (missingOptional.length) {
+    console.warn('Optional routes absent from feed, continuing without them:', missingOptional.join(', '));
   }
 
   const trips704 = {};
@@ -204,10 +216,32 @@ function composePayload(newFeed, stored) {
     .sort((a, b) => (a.feedStart < b.feedStart ? -1 : a.feedStart > b.feedStart ? 1 : 0));
   const primary = feeds.find(f => f.feedStart <= today && today <= f.feedEnd) || feeds[0];
 
+  const lastCovered = feeds.reduce((m, f) => (f.feedEnd > m ? f.feedEnd : m), '');
   return Object.assign({}, primary, {
     feeds: feeds.filter(f => f !== primary),
+    // Lets the app warn before coverage lapses instead of going blank on a platform.
+    coverage: { today, covered: feeds.some(f => f.feedStart <= today && today <= f.feedEnd), lastCovered },
     generatedAt: new Date().toISOString()
   });
+}
+
+// Keep a copy of every distinct feed UTA ever serves us. Retention only holds
+// unexpired feeds; this is the durable record, so a future gap can be backfilled
+// by hand instead of being lost the way 2026-08-07 was.
+async function archiveFeed(feed) {
+  try {
+    const bucket = getStorage().bucket('transit-cm-data');
+    const name = 'archive/gtfs_' + feed.feedStart + '_' + feed.feedEnd + '.json';
+    const file = bucket.file(name);
+    const [exists] = await file.exists();
+    if (exists) return false;
+    await file.save(JSON.stringify(feed), { contentType: 'application/json' });
+    console.log('Archived new feed version:', name);
+    return true;
+  } catch (e) {
+    console.warn('Archiving failed (non-fatal):', e && e.message);
+    return false;
+  }
 }
 
 function describeCoverage(payload) {
@@ -230,6 +264,7 @@ exports.refreshSchedule = onSchedule({
   const data = await buildGTFSData();
   const payload = composePayload(data, await readStored());
   await saveToBucket(payload);
+  await archiveFeed(pickFeedFields(data));
   const cov = describeCoverage(payload);
   console.log('Refreshed schedule.',
     'stopTimes:', data.stopTimes.length,

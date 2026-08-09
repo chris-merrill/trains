@@ -404,6 +404,20 @@ tailwind.config = {
     return box;
   }
 
+  // Early warning: coverage lapsing is the failure that strands you, so say it
+  // days ahead rather than at the moment the board goes empty.
+  function coverageWarning(){
+    var last=(GTFS&&GTFS.coverage&&GTFS.coverage.lastCovered)||
+      allFeeds().reduce(function(m,f){return f.feedEnd>m?f.feedEnd:m},'');
+    if(!last) return null;
+    var t=utahToday(),today=dstr(t.y,t.m,t.d);
+    if(last<today) return null;
+    var days=dayGap(today,last);
+    if(days>10) return null;
+    return mkEl('div','mb-3 px-3 py-2 rounded-xl border text-[11px] font-mono leading-relaxed text-amber-300/80 bg-amber-500/[0.05] border-amber-500/25',
+      ['Heads up — schedule data runs out in '+days+' day'+(days===1?'':'s')+', through '+fmtDate(last)+'. UTA normally publishes the next timetable before then.']);
+  }
+
   function renderApproxBanner(res){
     var box=mkEl('div','mb-3 px-3 py-2.5 rounded-xl border text-[11px] font-mono leading-relaxed text-amber-300/90 bg-amber-500/[0.06] border-amber-500/30');
     box.appendChild(txt('Estimated times — UTA has not published a schedule for this date. '
@@ -510,6 +524,9 @@ tailwind.config = {
     var board=document.getElementById('board');
     clearEl(board);
     updateControlsPill();
+
+    var cw=coverageWarning();
+    if(cw) board.appendChild(cw);
 
     var res=resolveFeed(y,m,d);
     if(!res){

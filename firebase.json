@@ -4,6 +4,20 @@
     "ignore": ["firebase.json", "**/.*", "**/.*/**", "**/node_modules/**", "functions/**", "gtfs_raw/**", "gtfs.zip", "gtfs_data.json", "icon.svg"],
     "rewrites": [
       { "source": "/gtfs_data.json", "function": { "functionId": "getSchedule", "region": "us-central1" } }
+    ],
+    "headers": [
+      {
+        "source": "/index.html",
+        "headers": [{ "key": "Cache-Control", "value": "no-cache, must-revalidate" }]
+      },
+      {
+        "source": "/",
+        "headers": [{ "key": "Cache-Control", "value": "no-cache, must-revalidate" }]
+      },
+      {
+        "source": "/manifest.json",
+        "headers": [{ "key": "Cache-Control", "value": "no-cache, must-revalidate" }]
+      }
     ]
   },
   "functions": [
