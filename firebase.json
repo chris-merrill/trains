@@ -3,7 +3,8 @@
     "public": ".",
     "ignore": ["firebase.json", "**/.*", "**/.*/**", "**/node_modules/**", "functions/**", "gtfs_raw/**", "gtfs.zip", "gtfs_data.json", "icon.svg"],
     "rewrites": [
-      { "source": "/gtfs_data.json", "function": { "functionId": "getSchedule", "region": "us-central1" } }
+      { "source": "/gtfs_data.json", "function": { "functionId": "getSchedule", "region": "us-central1" } },
+      { "source": "/delays.json", "function": { "functionId": "getDelays", "region": "us-central1" } }
     ],
     "headers": [
       {

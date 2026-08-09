@@ -108,7 +108,7 @@ async function buildGTFSData() {
   const stopTimes = [];
   for (const st of stRows) {
     if (tripsOfInterest.has(st.trip_id) && stopsOfInterest.has(st.stop_id)) {
-      stopTimes.push([st.trip_id, st.stop_id, st.arrival_time, st.departure_time]);
+      stopTimes.push([st.trip_id, st.stop_id, st.arrival_time, st.departure_time, st.stop_sequence]);
     }
   }
 
@@ -274,8 +274,102 @@ exports.refreshSchedule = onSchedule({
     'fetched feed:', data.feedStart + '–' + data.feedEnd,
     'retained:', cov.ranges);
   if (!cov.covered) {
-    console.warn('No retained feed covers today (' + denverToday() +
+    console.error('No retained feed covers today (' + denverToday() +
       '). UTA is publishing only future service; the app will show a coverage-gap notice.');
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Live delays: decode UTA's GTFS-realtime TripUpdates (open endpoint, no key)
+// and reduce it to per-stop delay seconds for just our trips and stops.
+// UTA's stopTimeUpdates carry stop_sequence + predicted epoch, not stop_id or
+// delay, so the schedule payload's stop_sequence column is what lets us join.
+const GtfsRT = require('gtfs-realtime-bindings');
+const RT_URL = 'https://apps.rideuta.com/tms/gtfs/TripUpdate';
+
+let schedCache = { at: 0, data: null };
+async function loadSchedule() {
+  if (schedCache.data && Date.now() - schedCache.at < 15 * 60000) return schedCache.data;
+  const bucket = getStorage().bucket('transit-cm-data');
+  const [contents] = await bucket.file(BUCKET_FILE).download();
+  schedCache = { at: Date.now(), data: JSON.parse(contents.toString('utf-8')) };
+  return schedCache.data;
+}
+
+function denverOffsetMinutes(d) {
+  // e.g. "GMT-6" in August, "GMT-7" in winter
+  const s = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Denver', timeZoneName: 'shortOffset' })
+    .formatToParts(d).find(p => p.type === 'timeZoneName').value;
+  const m = s.match(/GMT([+-]\d+)(?::(\d+))?/);
+  return m ? parseInt(m[1], 10) * 60 + (m[2] ? Math.sign(parseInt(m[1],10)) * parseInt(m[2], 10) : 0) : -360;
+}
+
+function schedEpoch(serviceDateYmd, hms) {
+  const [h, mi, se] = hms.split(':').map(Number);
+  const y = +serviceDateYmd.slice(0, 4), mo = +serviceDateYmd.slice(4, 6), da = +serviceDateYmd.slice(6, 8);
+  // schedule times can exceed 24:00
+  const base = Date.UTC(y, mo - 1, da, h, mi, se || 0);
+  const off = denverOffsetMinutes(new Date(base));
+  return Math.floor(base / 1000) - off * 60;
+}
+
+exports.getDelays = onRequest({
+  memory: '512MiB',
+  timeoutSeconds: 30,
+  region: 'us-central1',
+  cors: true
+}, async (req, res) => {
+  try {
+    const sched = await loadSchedule();
+    const ourTrips = new Set([
+      ...Object.keys(sched.trips704 || {}),
+      ...Object.keys(sched.trips750 || {}),
+      ...Object.keys(sched.trips871 || {})
+    ]);
+    // trip -> stop_sequence -> {stopId, schedArrHms, schedDepHms}
+    const bySeq = {};
+    for (const st of sched.stopTimes) {
+      if (st.length < 5) continue;            // pre-sequence payload: no join possible
+      if (!ourTrips.has(st[0])) continue;
+      (bySeq[st[0]] = bySeq[st[0]] || {})[String(+st[4])] = { sid: st[1], arr: st[2], dep: st[3] };
+    }
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 12000);
+    const r = await fetch(RT_URL, { signal: controller.signal });
+    clearTimeout(timer);
+    if (!r.ok) throw new Error('RT fetch HTTP ' + r.status);
+    const buf = Buffer.from(await r.arrayBuffer());
+    const msg = GtfsRT.transit_realtime.FeedMessage.decode(new Uint8Array(buf));
+
+    const today = denverToday();
+    const out = {};
+    for (const e of msg.entity) {
+      const tu = e.tripUpdate;
+      if (!tu || !tu.trip || !ourTrips.has(tu.trip.tripId)) continue;
+      const seqMap = bySeq[tu.trip.tripId];
+      if (!seqMap) continue;
+      const su = {};
+      for (const s of (tu.stopTimeUpdate || [])) {
+        const sched_ = seqMap[String(s.stopSequence)];
+        if (!sched_) continue;                 // not one of our stops
+        const arrT = s.arrival && s.arrival.time ? Number(s.arrival.time) : null;
+        const depT = s.departure && s.departure.time ? Number(s.departure.time) : null;
+        const arrD = arrT && sched_.arr ? arrT - schedEpoch(today, sched_.arr) : null;
+        const depD = depT && sched_.dep ? depT - schedEpoch(today, sched_.dep) : null;
+        su[sched_.sid] = [arrD, depD];
+      }
+      if (Object.keys(su).length || tu.delay) {
+        out[tu.trip.tripId] = { d: tu.delay || 0, su: su };
+      }
+    }
+
+    res.set('Cache-Control', 'public, max-age=30');
+    res.json({ t: Math.floor(Date.now() / 1000), trips: out });
+  } catch (e) {
+    console.warn('getDelays failed:', e);   // warn, not error: transient upstream flakes must not page
+    res.set('Cache-Control', 'no-store');
+    res.status(200).json({ t: 0, trips: {}, error: String(e && e.message || e) });
   }
 });
 

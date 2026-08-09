@@ -3,7 +3,7 @@
 //   schedule data -> network-first with timeout, cache fallback
 //   static assets -> cache-first
 // Bump CACHE to invalidate everything on the next deploy.
-const CACHE = 'transit-v6';
+const CACHE = 'transit-v7';
 const SHELL = [
   '/', '/index.html', '/manifest.json',
   '/fonts/barlow-condensed-500.woff2', '/fonts/barlow-condensed-600.woff2',
