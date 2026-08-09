@@ -360,6 +360,36 @@ header{margin-bottom:1.25rem}
 #feedNoteToggle svg{width:.7rem;height:.7rem;transition:transform .2s}
 #feedNote{display:none;margin-top:.5rem;font-family:var(--font-mono);font-size:.65rem;color:var(--faint)}
 #feedNote.open{display:block}
+/* ---------------------------------------------------------------- splash */
+#splash{
+  position:fixed;inset:0;z-index:100;display:none;
+  flex-direction:column;align-items:center;justify-content:center;gap:1.1rem;
+  background:var(--bg);
+}
+#splash.on{display:flex}
+#splash.done{animation:splFade .3s ease-out .75s both}
+.spl-word{
+  font-family:var(--font-display);font-weight:600;font-size:1.3rem;
+  letter-spacing:.55em;text-indent:.55em;color:var(--text);
+  animation:splWord .5s ease-out .3s both;
+}
+.spl-leg{stroke-dasharray:43;stroke-dashoffset:43;animation:splDraw .32s cubic-bezier(.2,.7,.3,1) forwards}
+.spl-l2{animation-delay:.22s}
+.spl-dot{transform-origin:center;transform-box:fill-box;transform:scale(0);animation:splPop .25s cubic-bezier(.2,.9,.3,1.4) forwards}
+.spl-d1{animation-delay:.05s}
+.spl-d2{animation-delay:.28s}
+.spl-d3{animation-delay:.5s}
+@keyframes splDraw{to{stroke-dashoffset:0}}
+@keyframes splPop{to{transform:scale(1)}}
+@keyframes splWord{from{opacity:0;letter-spacing:.9em}to{opacity:1;letter-spacing:.55em}}
+@keyframes splFade{to{opacity:0;visibility:hidden}}
+/* --------------------------------------------------------------- offline dot */
+#netDot{
+  width:.5rem;height:.5rem;border-radius:50%;flex-shrink:0;display:none;
+}
+#netDot.ready{display:block;background:var(--trax)}
+#netDot.off{display:block;background:var(--amber);animation:pulseDot 2s ease-in-out infinite}
+@keyframes pulseDot{50%{opacity:.4}}
 /* ---------------------------------------------------------------- motion */
 @keyframes riseIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 @keyframes growIn{from{transform:translateX(-50%) scaleY(0)}to{transform:translateX(-50%) scaleY(1)}}
@@ -377,6 +407,16 @@ header{margin-bottom:1.25rem}
 </style>
 </head>
 <body>
+<div id="splash" aria-hidden="true">
+  <svg viewBox="0 0 120 120" width="96" height="96">
+    <line class="spl-leg spl-l1" x1="30" y1="90" x2="60" y2="60" stroke="#2EB566" stroke-width="9" stroke-linecap="round"/>
+    <line class="spl-leg spl-l2" x1="60" y1="60" x2="90" y2="30" stroke="#C227B9" stroke-width="9" stroke-linecap="round"/>
+    <circle class="spl-dot spl-d1" cx="30" cy="90" r="8" fill="#0C0E11" stroke="#2EB566" stroke-width="5"/>
+    <circle class="spl-dot spl-d2" cx="60" cy="60" r="7" fill="#0C0E11" stroke="#F2F0EB" stroke-width="4"/>
+    <circle class="spl-dot spl-d3" cx="90" cy="30" r="8" fill="#0C0E11" stroke="#C227B9" stroke-width="5"/>
+  </svg>
+  <div class="spl-word">TRAINS</div>
+</div>
 <div class="wrap">
 
   <header>
@@ -391,6 +431,7 @@ header{margin-bottom:1.25rem}
         <ul id="routeMenu" role="listbox" aria-label="Select route"></ul>
       </div>
       <button id="refreshBtn" type="button" title="Tap to refresh schedule data">
+        <span id="netDot"></span>
         <svg id="refreshIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 0 1-15.9 5.7L3 15m0 0v5m0-5h5m-5-3a9 9 0 0 1 15.9-5.7L21 9m0 0V4m0 5h-5"/></svg>
         <span id="freshness">&hellip;</span>
       </button>
@@ -1192,16 +1233,50 @@ header{margin-bottom:1.25rem}
     var d=Math.floor(h/24);
     return d+'d '+(h%24)+'h ago';
   }
+  // Offline story, made visible:
+  //   green dot  = everything this app needs is saved on this device
+  //   amber dot  = offline right now, running on the saved schedule
+  var OFFLINE_READY=false;
+  function checkOfflineReady(){
+    if(!('caches' in window)){OFFLINE_READY=!!lsGet(GTFS_CACHE_KEY);updateFreshnessLabel();return}
+    Promise.all([
+      caches.match('/index.html'),
+      caches.match('/fonts/barlow-condensed-600.woff2')
+    ]).then(function(r){
+      var shell=!!(r[0]&&r[1]);
+      var data=!!lsGet(GTFS_CACHE_KEY)||GTFS.stopTimes.length>0;  // embedded copy counts
+      OFFLINE_READY=shell&&data&&!!navigator.serviceWorker.controller;
+      updateFreshnessLabel();
+    }).catch(function(){});
+  }
+  function isOffline(){return navigator.onLine===false||lastRefreshFailed}
   function updateFreshnessLabel(){
     var btn=document.getElementById('refreshBtn');
     var el=document.getElementById('freshness');
+    var dot=document.getElementById('netDot');
     var t=GTFS.generatedAt?new Date(GTFS.generatedAt).getTime():0;
     var ageMs=t?Date.now()-t:Infinity;
     var age=formatAge(GTFS.generatedAt);
-    el.textContent=lastRefreshFailed?age+' \u00b7 offline':age;
-    btn.classList.toggle('is-stale',lastRefreshFailed||ageMs>8*3600000);
-    btn.setAttribute('title','Schedule updated '+age+' · tap to refresh');
+    if(isOffline()){
+      el.textContent='offline \u00b7 saved schedule';
+      dot.className='off';
+      btn.classList.add('is-stale');
+      btn.setAttribute('title','No connection \u2014 running on the schedule saved on this device ('+age+')');
+    } else {
+      el.textContent=age;
+      dot.className=OFFLINE_READY?'ready':'';
+      btn.classList.toggle('is-stale',ageMs>8*3600000);
+      btn.setAttribute('title','Schedule updated '+age+
+        (OFFLINE_READY?' \u00b7 saved for offline use':'')+' \u00b7 tap to refresh');
+    }
   }
+  window.addEventListener('offline',updateFreshnessLabel);
+  window.addEventListener('online',function(){
+    lastRefreshFailed=false;
+    updateFreshnessLabel();
+    fetchFreshGTFS();
+    fetchDelays();
+  });
   var refreshInflight=false;
   var lastRefreshFailed=false;
 
@@ -1535,6 +1610,8 @@ header{margin-bottom:1.25rem}
   updateHeader();
   updateModeButtons();
   updateFreshnessLabel();
+  checkOfflineReady();
+  setTimeout(checkOfflineReady,4000);   // again once the SW finishes installing
   setInterval(updateFreshnessLabel,30000);
   // Fetch fresh GTFS on load (background; swaps in if newer), and again
   // whenever the tab comes back to the foreground with stale-ish data.
@@ -1557,10 +1634,28 @@ header{margin-bottom:1.25rem}
       seen[k]=1;
       parts.push(fmtDate(f.feedStart)+' \u2013 '+fmtDate(f.feedEnd));
     });
-    note.textContent=parts.length?'Valid '+parts.join(' \u00b7 ')+' \u00b7 UTA GTFS':'';
+    var txt=parts.length?'Valid '+parts.join(' \u00b7 ')+' \u00b7 UTA GTFS':'';
+    if(OFFLINE_READY) txt+='\n\u2713 Offline ready \u2014 the app and the full schedule are saved on this device.';
+    note.textContent=txt;
+    note.style.whiteSpace='pre-line';
   }
   updateFeedNote();
   update();
+
+  // Splash: a launch moment for the installed app. Never in a browser tab,
+  // never on SW-triggered reloads, never for reduced-motion users.
+  (function(){
+    var el=document.getElementById('splash');
+    if(!el) return;
+    var standalone=window.matchMedia('(display-mode: standalone)').matches||window.navigator.standalone===true;
+    var reduced=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    var seen=false;
+    try{seen=sessionStorage.getItem('transit.splashed')==='1'}catch(e){}
+    if(!standalone||reduced||seen){el.remove();return}
+    try{sessionStorage.setItem('transit.splashed','1')}catch(e){}
+    el.classList.add('on','done');
+    setTimeout(function(){el.remove()},1300);
+  })();
 
   if('serviceWorker' in navigator){
     window.addEventListener('load',function(){
