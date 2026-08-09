@@ -1,7 +1,6 @@
 name: Deploy
+# Manual tool only — deploys are never automatic; GitHub is just the repo.
 on:
-  push:
-    branches: [main]
   workflow_dispatch: {}
 
 jobs:
