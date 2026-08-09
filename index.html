@@ -285,6 +285,64 @@ header{margin-bottom:1.25rem}
 .btn-ghost:hover{background:var(--surface-2)}
 .btn-amber:active,.btn-ghost:active{transform:scale(.96)}
 .loading{display:flex;align-items:center;justify-content:center;gap:.75rem;padding:3rem 0;color:var(--faint);font-family:var(--font-mono);font-size:.8rem}
+/* ------------------------------------------------------------- schedule sheet */
+#sheetOverlay{
+  display:none;position:fixed;inset:0;z-index:40;
+  background:rgba(6,8,10,.7);-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);
+}
+#sheetOverlay.open{display:block}
+#sheet{
+  position:fixed;left:0;right:0;bottom:0;z-index:41;
+  max-width:40rem;margin:0 auto;max-height:72vh;display:flex;flex-direction:column;
+  background:var(--surface);border:1px solid var(--hairline);border-bottom:0;
+  border-radius:1.1rem 1.1rem 0 0;
+  padding-bottom:env(safe-area-inset-bottom);
+  animation:sheetUp .28s cubic-bezier(.2,.7,.3,1) both;
+}
+@keyframes sheetUp{from{transform:translateY(30px);opacity:0}to{transform:none;opacity:1}}
+.sheet-head{
+  display:flex;align-items:center;justify-content:space-between;gap:1rem;
+  padding:1rem 1.1rem .75rem;border-bottom:1px solid var(--hairline);flex-shrink:0;
+}
+.sheet-title{font-family:var(--font-display);font-weight:600;font-size:1.15rem;letter-spacing:.06em;text-transform:uppercase}
+.sheet-sub{font-family:var(--font-mono);font-size:.65rem;color:var(--faint);margin-top:.1rem}
+.sheet-close{
+  padding:.5rem;margin:-.5rem;color:var(--faint);display:flex;transition:color .15s;
+}
+.sheet-close:hover{color:var(--text)}
+.sheet-close svg{width:1.15rem;height:1.15rem}
+.sheet-body{overflow-y:auto;padding:.5rem .6rem 1rem;-webkit-overflow-scrolling:touch}
+.m-row{
+  width:100%;display:flex;align-items:baseline;gap:.75rem;text-align:left;
+  padding:.7rem .6rem;border-radius:.55rem;
+  font-family:var(--font-mono);font-size:.85rem;
+}
+.m-row:hover{background:var(--surface-2)}
+.m-row .r-dep{color:var(--text);font-variant-numeric:tabular-nums;width:4.6rem}
+.m-row .r-arrow{color:var(--faint)}
+.m-row .r-arr{color:var(--muted);font-variant-numeric:tabular-nums;width:4.6rem}
+.m-row .r-fill{flex:1}
+.m-row .r-total{font-size:.7rem;color:var(--faint);font-variant-numeric:tabular-nums}
+.m-row .r-in{font-size:.7rem;color:var(--faint);font-variant-numeric:tabular-nums;width:3.4rem;text-align:right}
+.m-row.sel{background:var(--surface-2);box-shadow:inset 2px 0 0 var(--trax)}
+.m-row.past{opacity:.4}
+.row-btn{cursor:pointer;transition:border-color .15s}
+.row-btn:hover{border-color:var(--faint)}
+.hero-more{
+  margin-left:auto;font-family:var(--font-mono);font-size:.65rem;color:var(--faint);
+  letter-spacing:.05em;transition:color .15s;flex-shrink:0;
+}
+.hero-more:hover{color:var(--text)}
+/* --------------------------------------------------------------- quick actions */
+.quick{margin-bottom:1rem;display:none}
+.quick.show{display:block}
+#landedBtn{
+  width:100%;display:flex;align-items:center;justify-content:center;gap:.5rem;
+  padding:.7rem 1rem;border:1px dashed var(--hairline);border-radius:.75rem;
+  font-family:var(--font-mono);font-size:.75rem;color:var(--muted);transition:color .15s,border-color .15s;
+}
+#landedBtn:hover{color:var(--text);border-color:var(--faint)}
+#landedBtn:active{transform:scale(.985)}
 /* ---------------------------------------------------------------- footer */
 .foot{margin-top:1.5rem;padding-top:.75rem;border-top:1px solid var(--hairline)}
 #feedNoteToggle{display:flex;align-items:center;gap:.3rem;font-family:var(--font-mono);font-size:.65rem;color:var(--faint);transition:color .15s}
@@ -371,10 +429,29 @@ header{margin-bottom:1.25rem}
     </div>
   </div>
 
+  <div class="quick" id="quickRow">
+    <button id="landedBtn" type="button">&#9992;&#xFE0E; Just landed &mdash; plan from touchdown +15 min</button>
+  </div>
+
   <div id="board">
     <div class="loading">
       <svg class="spin" width="18" height="18" viewBox="0 0 24 24"><circle opacity=".25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"/><path opacity=".75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
       Loading&hellip;
+    </div>
+  </div>
+
+  <div id="sheetOverlay">
+    <div id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
+      <div class="sheet-head">
+        <div>
+          <div class="sheet-title" id="sheetTitle">Full schedule</div>
+          <div class="sheet-sub" id="sheetSub"></div>
+        </div>
+        <button class="sheet-close" id="sheetClose" type="button" aria-label="Close">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </div>
+      <div class="sheet-body" id="sheetBody"></div>
     </div>
   </div>
 
@@ -805,6 +882,9 @@ header{margin-bottom:1.25rem}
 
     var foot=mkEl('div','hero-foot');
     foot.appendChild(mkEl('span','hero-total',[total+' min door to door']));
+    var more=mkEl('button','hero-more',['Full schedule \u203a']);
+    more.type='button';
+    more.addEventListener('click',openSheet);
     // Earlier leg-1 options that also catch the same leg-2 train
     if(ctx.alts&&ctx.alts.length){
       var altTimes=ctx.alts.map(function(a){return minToDisplay(a.leg1Dep)}).join(', ');
@@ -812,6 +892,7 @@ header{margin-bottom:1.25rem}
       alts.appendChild(mkEl('b',null,[altTimes]));
       foot.appendChild(alts);
     }
+    foot.appendChild(more);
     card.appendChild(foot);
     return card;
   }
@@ -819,7 +900,10 @@ header{margin-bottom:1.25rem}
   function renderNeighborRow(c,ctx,kind){
     var total=Math.round(c.finalArr-c.leg1Dep);
     var departed=ctx.isToday&&c.leg1Dep<ctx.realNowMin;
-    var row=mkEl('div','row row--'+kind+(departed?' row--past':'')+(ctx.animate?' row-enter':''));
+    var row=mkEl('button','row row-btn row--'+kind+(departed?' row--past':'')+(ctx.animate?' row-enter':''));
+    row.type='button';
+    row.setAttribute('aria-label','Show the full schedule for this day');
+    row.addEventListener('click',openSheet);
     row.style.animationDelay='0.03s';
     row.appendChild(mkEl('span','r-kind',[departed?'Departed':(kind==='earlier'?'Earlier':'Later')]));
     row.appendChild(mkEl('span','r-dep',[minToDisplay(c.leg1Dep)]));
@@ -952,10 +1036,78 @@ header{margin-bottom:1.25rem}
     var key=DIRECTION+'|'+MODE+'|'+dstr(y,m,d)+'|'+primary.leg1Dep+'|'+primary.xferDep+'|'+primary.finalArr;
     ctx.animate=key!==lastRenderKey;
     lastRenderKey=key;
+
+    // Stash the whole day for the schedule sheet.
+    SHEET_DATA={list:fullDedup,primary:primary,ctx:ctx,dateStr:updateControlsPillDateStr(y,m,d)};
+    if(document.getElementById('sheetOverlay').classList.contains('open')) fillSheet();
+
     if(earlier) board.appendChild(renderNeighborRow(earlier,ctx,'earlier'));
     board.appendChild(renderHero(primary,ctx));
     if(later) board.appendChild(renderNeighborRow(later,ctx,'later'));
+
+    // Pinned-tab glanceability: put the countdown in the title.
+    if(isToday&&MODE==='depart'){
+      var inT=Math.round(primary.leg1Dep-realNowMin);
+      if(inT>=0&&inT<=180){
+        document.title='in '+inT+'m \u00b7 '+minToDisplay(primary.leg1Dep)+' \u2192 '+dir.dest;
+        return;
+      }
+    }
+    document.title=dir.origin+' \u2192 '+dir.dest;
   }
+
+  // ---- Full-day schedule sheet -------------------------------------------
+  var SHEET_DATA=null;
+  function fillSheet(){
+    if(!SHEET_DATA) return;
+    var body=document.getElementById('sheetBody');
+    clearEl(body);
+    document.getElementById('sheetSub').textContent=
+      DIRECTIONS[DIRECTION].origin+' \u2192 '+DIRECTIONS[DIRECTION].dest+' \u00b7 '+SHEET_DATA.dateStr;
+    var sel=null;
+    SHEET_DATA.list.forEach(function(c){
+      var isSel=c.xferDep===SHEET_DATA.primary.xferDep&&c.finalArr===SHEET_DATA.primary.finalArr;
+      var past=SHEET_DATA.ctx.isToday&&c.leg1Dep<SHEET_DATA.ctx.realNowMin;
+      var row=mkEl('button','m-row'+(isSel?' sel':'')+(past&&!isSel?' past':''));
+      row.type='button';
+      row.appendChild(mkEl('span','r-dep',[minToDisplay(c.leg1Dep)]));
+      row.appendChild(mkEl('span','r-arrow',['\u2192']));
+      row.appendChild(mkEl('span','r-arr',[minToDisplay(c.finalArr)]));
+      row.appendChild(mkEl('span','r-fill'));
+      row.appendChild(mkEl('span','r-total',[Math.round(c.finalArr-c.leg1Dep)+'m']));
+      if(SHEET_DATA.ctx.isToday&&c.leg1Dep>=SHEET_DATA.ctx.realNowMin){
+        row.appendChild(mkEl('span','r-in',['in '+Math.round(c.leg1Dep-SHEET_DATA.ctx.realNowMin)+'m']));
+      }
+      row.addEventListener('click',function(){
+        FOLLOW_NOW=false;
+        writeTimeInput(MODE==='arrive'?c.finalArr:c.leg1Dep);
+        closeSheet();
+        update();
+      });
+      if(isSel) sel=row;
+      body.appendChild(row);
+    });
+    if(sel) setTimeout(function(){sel.scrollIntoView({block:'center'})},0);
+  }
+  var sheetReturnFocus=null;
+  function openSheet(){
+    if(!SHEET_DATA) return;
+    sheetReturnFocus=document.activeElement;
+    fillSheet();
+    document.getElementById('sheetOverlay').classList.add('open');
+    document.getElementById('sheetClose').focus();
+  }
+  function closeSheet(){
+    document.getElementById('sheetOverlay').classList.remove('open');
+    if(sheetReturnFocus&&sheetReturnFocus.focus) sheetReturnFocus.focus();
+  }
+  document.getElementById('sheetClose').addEventListener('click',closeSheet);
+  document.getElementById('sheetOverlay').addEventListener('click',function(e){
+    if(e.target===this) closeSheet();
+  });
+  document.addEventListener('keydown',function(e){
+    if(e.key==='Escape') closeSheet();
+  });
 
   function setNow(){
     var n=utahToday();
@@ -1085,6 +1237,7 @@ header{margin-bottom:1.25rem}
     document.getElementById('leg2Badge').className='badge badge--'+dir.leg2.color;
     document.getElementById('transferLabel').textContent=dir.transferName;
     updateWeekendHint();
+    document.getElementById('quickRow').classList.toggle('show',DIRECTION==='airportToProvo');
     // Arrow always points right — text order already conveys direction
     document.title=dir.origin+' \u2192 '+dir.dest;
   }
@@ -1243,6 +1396,14 @@ header{margin-bottom:1.25rem}
   });
 
   document.getElementById('nowBtn').addEventListener('click',function(){FOLLOW_NOW=true;setNow();syncTimeDisplay();update()});
+  document.getElementById('landedBtn').addEventListener('click',function(){
+    // Deplane + walk to TRAX is reliably ~15 minutes.
+    FOLLOW_NOW=false;
+    MODE='depart';lsSet('transit.mode',MODE);updateModeButtons();
+    setNow();
+    writeTimeInput(Math.min(1439,parseTimeInput()+15));
+    update();
+  });
   document.getElementById('dateInput').addEventListener('change',update);
 
   function stepDate(delta){
@@ -1261,19 +1422,17 @@ header{margin-bottom:1.25rem}
   // Controls pill disclosure
   var MONTHS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   var WEEKDAYS=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  function updateControlsPillDateStr(y,m,d){
+    var today=utahToday();
+    if(y===today.y&&m===today.m&&d===today.d) return 'today';
+    var dd=new Date(y,m-1,d);
+    return WEEKDAYS[dd.getDay()]+' '+MONTHS[m-1]+' '+d;
+  }
   function updateControlsPill(){
     var inp=getInputs();
-    var today=utahToday();
-    var isToday=inp.y===today.y&&inp.m===today.m&&inp.d===today.d;
     var verb=MODE==='depart'?'Depart':'Arrive by';
-    var dateStr;
-    if(isToday) dateStr='today';
-    else {
-      var dd=new Date(inp.y,inp.m-1,inp.d);
-      dateStr=WEEKDAYS[dd.getDay()]+' '+MONTHS[inp.m-1]+' '+inp.d;
-    }
     var timeStr=minToDisplay(inp.h*60+inp.mi);
-    document.getElementById('controlsSummary').textContent=verb+' \u00b7 '+dateStr+' \u00b7 '+timeStr;
+    document.getElementById('controlsSummary').textContent=verb+' \u00b7 '+updateControlsPillDateStr(inp.y,inp.m,inp.d)+' \u00b7 '+timeStr;
   }
   document.getElementById('controlsPill').addEventListener('click',function(){
     var drawer=document.getElementById('controlsDrawer');
