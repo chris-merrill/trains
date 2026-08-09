@@ -1,7 +1,9 @@
 name: Refresh schedule
+# Manual tool only — the app is operationally all-Firebase: the getSchedule
+# Cloud Function serves fresh data and the client caches its last good fetch
+# in localStorage as the fallback. Run this by hand if you ever want to bake
+# a fresh snapshot into the HTML and redeploy without a laptop.
 on:
-  schedule:
-    - cron: '0 10 * * *' # daily 10:00 UTC = 4am Mountain
   workflow_dispatch: {}
 
 permissions:
