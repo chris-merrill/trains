@@ -6,3 +6,6 @@ gtfs.zip
 .DS_Store
 .env
 .claude/
+.transitland_key
+*_key
+*.key
