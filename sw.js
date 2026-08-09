@@ -3,7 +3,7 @@
 //   schedule data -> network-first, cache fallback (fresh when possible, usable when not)
 //   everything else (icons, the Tailwind CDN bundle) -> cache-first
 // Bump CACHE to invalidate everything on the next deploy.
-const CACHE = 'transit-v3';
+const CACHE = 'transit-v4';
 const SHELL = ['/', '/index.html', '/manifest.json', '/apple-touch-icon.png'];
 const DATA_PATH = '/gtfs_data.json';
 

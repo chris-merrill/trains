@@ -1032,7 +1032,28 @@ tailwind.config = {
 
   if('serviceWorker' in navigator){
     window.addEventListener('load',function(){
-      navigator.serviceWorker.register('/sw.js').catch(function(e){
+      navigator.serviceWorker.register('/sw.js').then(function(reg){
+        // This app lives in a pinned tab for days. A tab left open across a
+        // deploy keeps running its original JavaScript forever — the data
+        // refreshes but the code never does, which is how a fixed bug can
+        // still be on screen hours later. Check for a new version on load and
+        // every time the tab is brought back to the foreground.
+        function checkForUpdate(){ try{ reg.update() }catch(e){} }
+        checkForUpdate();
+        document.addEventListener('visibilitychange',function(){
+          if(document.visibilityState==='visible') checkForUpdate();
+        });
+        reg.addEventListener('updatefound',function(){
+          var incoming=reg.installing;
+          if(!incoming) return;
+          incoming.addEventListener('statechange',function(){
+            // controller present => this is an update, not a first install,
+            // so reloading swaps the user onto the new code immediately.
+            if(incoming.state==='installed'&&navigator.serviceWorker.controller)
+              location.reload();
+          });
+        });
+      }).catch(function(e){
         console.warn('Service worker registration failed:',e);
       });
     });
