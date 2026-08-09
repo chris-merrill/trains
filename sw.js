@@ -1,11 +1,18 @@
 // Offline support for airport wifi. Three strategies, by request type:
-//   navigations   -> network-first, cache fallback (deploys land fast, offline still opens)
-//   schedule data -> network-first, cache fallback (fresh when possible, usable when not)
-//   everything else (icons, the Tailwind CDN bundle) -> cache-first
+//   navigations   -> network-first with a short timeout, cache fallback
+//   schedule data -> network-first with timeout, cache fallback
+//   static assets -> cache-first
 // Bump CACHE to invalidate everything on the next deploy.
-const CACHE = 'transit-v4';
-const SHELL = ['/', '/index.html', '/manifest.json', '/apple-touch-icon.png'];
+const CACHE = 'transit-v5';
+const SHELL = [
+  '/', '/index.html', '/manifest.json',
+  '/fonts/barlow-condensed-500.woff2', '/fonts/barlow-condensed-600.woff2',
+  '/icon-192.png', '/icon-512.png', '/apple-touch-icon.png',
+];
 const DATA_PATH = '/gtfs_data.json';
+// Captive portals and airport wifi can hold a connection open for ages.
+// Past this, a cached copy beats a spinner.
+const NAV_TIMEOUT_MS = 3500;
 
 self.addEventListener('install', (e) => {
   // addAll fails the whole install if any single entry 404s, so add individually.
@@ -24,19 +31,34 @@ self.addEventListener('activate', (e) => {
   );
 });
 
-// The app cache-busts with ?t=<now>; strip it so every fetch doesn't miss.
+// The app may cache-bust with ?t=<now>; strip it so every fetch hits one entry.
 function dataKey() {
   return new Request(DATA_PATH);
 }
 
-async function networkFirst(req, key) {
+function fetchWithTimeout(req, ms) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('sw-timeout')), ms);
+    fetch(req).then(
+      res => { clearTimeout(timer); resolve(res); },
+      err => { clearTimeout(timer); reject(err); }
+    );
+  });
+}
+
+async function networkFirst(req, key, timeoutMs) {
   const cache = await caches.open(CACHE);
   try {
-    const res = await fetch(req);
-    if (res && res.ok) cache.put(key || req, res.clone());
-    return res;
+    const res = timeoutMs ? await fetchWithTimeout(req, timeoutMs) : await fetch(req);
+    if (res && res.ok) {
+      cache.put(key || req, res.clone());
+      return res;
+    }
+    // Server errors and captive-portal junk: prefer a known-good cached copy.
+    const hit = await cache.match(key || req) || await caches.match(key || req);
+    return hit || res;
   } catch (err) {
-    const hit = await cache.match(key || req);
+    const hit = await cache.match(key || req) || await caches.match(key || req);
     if (hit) return hit;
     throw err;
   }
@@ -44,12 +66,10 @@ async function networkFirst(req, key) {
 
 async function cacheFirst(req) {
   const cache = await caches.open(CACHE);
-  const hit = await cache.match(req);
+  const hit = await cache.match(req) || await caches.match(req);
   if (hit) return hit;
   const res = await fetch(req);
-  // Opaque (cross-origin, no-cors) responses are still worth storing — that is
-  // how the Tailwind bundle survives going offline.
-  if (res && (res.ok || res.type === 'opaque')) cache.put(req, res.clone());
+  if (res && res.ok) cache.put(req, res.clone());
   return res;
 }
 
@@ -61,16 +81,25 @@ self.addEventListener('fetch', (e) => {
 
   if (req.mode === 'navigate') {
     e.respondWith(
-      networkFirst(req, new Request('/index.html'))
-        .catch(() => caches.match('/index.html').then(r => r || caches.match('/')))
+      networkFirst(req, new Request('/index.html'), NAV_TIMEOUT_MS)
+        .catch(() => caches.match('/index.html'))
+        .then(r => r || new Response('Offline', { status: 503, headers: { 'Content-Type': 'text/plain' } }))
     );
     return;
   }
 
   if (url.origin === self.location.origin && url.pathname === DATA_PATH) {
-    e.respondWith(networkFirst(req, dataKey()));
+    e.respondWith(
+      networkFirst(req, dataKey(), NAV_TIMEOUT_MS * 2)
+        .catch(() => caches.match(dataKey()))
+        .then(r => r || new Response('{"error":"offline"}', { status: 503, headers: { 'Content-Type': 'application/json' } }))
+    );
     return;
   }
 
-  e.respondWith(cacheFirst(req).catch(() => caches.match(req)));
+  e.respondWith(
+    cacheFirst(req)
+      .catch(() => caches.match(req))
+      .then(r => r || new Response('', { status: 504 }))
+  );
 });
