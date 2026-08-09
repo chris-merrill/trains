@@ -1,6 +1,10 @@
 name: Deploy
-# Manual tool only — deploys are never automatic; GitHub is just the repo.
+# TEMPORARY one-shot: push trigger restored so merging this fires the first
+# deploy without a laptop. Will be reverted to dispatch-only (or deleted)
+# right after the deploy succeeds.
 on:
+  push:
+    branches: [main]
   workflow_dispatch: {}
 
 jobs:
