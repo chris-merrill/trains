@@ -295,16 +295,23 @@ tailwind.config = {
       leg1:{label:'FrontRunner',color:'fr',tripsKey:'trips750',fromKey:'provoStops',toKey:'transferFR',fromName:'Provo'},
       leg2:{label:'Green Line',color:'trax',tripsKey:'trips704',fromKey:'transferTrax',toKey:'airportStops',destName:'Airport'}
     },
-    provoToAdobe:{
-      origin:'Provo Central',dest:'Adobe Lehi',transferName:'Lehi Stn',
-      leg1:{label:'FrontRunner',color:'fr',tripsKey:'trips750',fromKey:'provoStops',toKey:'lehiFRStops',fromName:'Provo'},
-      leg2:{label:'Route 871',color:'bus',tripsKey:'trips871',fromKey:'lehiBusStops',toKey:'adobeStops',destName:'Adobe'}
-    },
-    adobeToProvo:{
-      origin:'Adobe Lehi',dest:'Provo Central',transferName:'Lehi Stn',
-      leg1:{label:'Route 871',color:'bus',tripsKey:'trips871',fromKey:'adobeStops',toKey:'lehiBusStops',fromName:'Adobe'},
-      leg2:{label:'FrontRunner',color:'fr',tripsKey:'trips750',fromKey:'lehiFRStops',toKey:'provoStops',destName:'Provo'}
-    }
+    // --- Route 871 / Adobe Lehi: temporarily disabled in the UI ---------------
+    // Hidden while UTA's published feed doesn't cover the current dates. Unlike
+    // rail, 871's timetable really does move between service changes (Aug 2026:
+    // Lehi->Sandy +11 min, Adobe->Lehi -2 min), so it can't be shown safely
+    // during a coverage gap. The data pipeline still fetches and archives 871,
+    // so re-enabling is just uncommenting this block and its ROUTE_ORDER entry.
+    // provoToAdobe:{
+    //   origin:'Provo Central',dest:'Adobe Lehi',transferName:'Lehi Stn',
+    //   leg1:{label:'FrontRunner',color:'fr',tripsKey:'trips750',fromKey:'provoStops',toKey:'lehiFRStops',fromName:'Provo'},
+    //   leg2:{label:'Route 871',color:'bus',tripsKey:'trips871',fromKey:'lehiBusStops',toKey:'adobeStops',destName:'Adobe'}
+    // },
+    // adobeToProvo:{
+    //   origin:'Adobe Lehi',dest:'Provo Central',transferName:'Lehi Stn',
+    //   leg1:{label:'Route 871',color:'bus',tripsKey:'trips871',fromKey:'adobeStops',toKey:'lehiBusStops',fromName:'Adobe'},
+    //   leg2:{label:'FrontRunner',color:'fr',tripsKey:'trips750',fromKey:'lehiFRStops',toKey:'provoStops',destName:'Provo'}
+    // }
+    // -------------------------------------------------------------------------
   };
   var DIRECTION=localStorage.getItem('transit.route');
   if(!DIRECTION){
@@ -470,8 +477,8 @@ tailwind.config = {
     box.appendChild(txt(ok
       ? 'Verified times — UTA has not republished this date, so these come from the '
         +fmtDate(res.source.feedStart)+' timetable. Checked departure-by-departure against UTA’s '
-        +'published timetable and the archived live feed for weekdays, Saturdays and Sundays: identical. '
-        +'Rail times are exact; Route 871 is withheld separately.'
+        +'published timetable and the archived live feed for weekdays, Saturdays and Sundays: identical.'
+        // Restore with the Adobe routes: +' Rail times are exact; Route 871 is withheld separately.'
       : 'Estimated times — UTA has not published a schedule for this date. '
         +'These come from the '+fmtDate(res.source.feedStart)+' timetable for the same weekday. '
         +'Verify before you rely on them.'));
@@ -586,10 +593,11 @@ tailwind.config = {
       var ds0=dstr(y,m,d),nx=nextCoveredDate(ds0);
       var gmsg='UTA has not published a schedule covering this date.';
       if(nx) gmsg+=' Timetables resume '+fmtDate(nx)+'.';
-      if(APPROX_ON&&isAdobeRoute(DIRECTION))
-        gmsg='Route 871’s timetable changes on '+fmtDate(nx||'')+
-             ', so estimates would be wrong by a few minutes on an hourly bus. '+
-             'Estimates stay off for this route — check the UTA app for today’s bus times.';
+      // Unreachable while the Adobe routes are disabled above; restore with them.
+      // if(APPROX_ON&&isAdobeRoute(DIRECTION))
+      //   gmsg='Route 871’s timetable changes on '+fmtDate(nx||'')+
+      //        ', so estimates would be wrong by a few minutes on an hourly bus. '+
+      //        'Estimates stay off for this route — check the UTA app for today’s bus times.';
       board.appendChild(renderGap(gmsg,nx,APPROX_ON&&isAdobeRoute(DIRECTION)?null:nearestFeed(ds0)));
       return;
     }
@@ -803,7 +811,9 @@ tailwind.config = {
     if(dow===0||dow===6) hint.classList.remove('hidden'); else hint.classList.add('hidden');
   }
 
-  var ROUTE_ORDER=['airportToProvo','provoToAirport','provoToAdobe','adobeToProvo'];
+  // 871/Adobe entries disabled with their DIRECTIONS blocks above:
+  // var ROUTE_ORDER=['airportToProvo','provoToAirport','provoToAdobe','adobeToProvo'];
+  var ROUTE_ORDER=['airportToProvo','provoToAirport'];
   var SVG_NS='http://www.w3.org/2000/svg';
   function makeCheckIcon(){
     var svg=document.createElementNS(SVG_NS,'svg');
