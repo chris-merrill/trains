@@ -1,4 +1,8 @@
 const { onSchedule } = require('firebase-functions/v2/scheduler');
+// gen-2 runs on Cloud Run, where bare console.error lands as severity
+// "Default" — invisible to a severity>=ERROR alert. logger.error emits
+// structured JSON that Cloud Logging ingests at real ERROR severity.
+const logger = require('firebase-functions/logger');
 const { onRequest } = require('firebase-functions/v2/https');
 const { initializeApp } = require('firebase-admin/app');
 const { getStorage } = require('firebase-admin/storage');
@@ -261,6 +265,7 @@ exports.refreshSchedule = onSchedule({
   timeoutSeconds: 300,
   region: 'us-central1'
 }, async () => {
+  try {
   const data = await buildGTFSData();
   const payload = composePayload(data, await readStored());
   await saveToBucket(payload);
@@ -274,8 +279,12 @@ exports.refreshSchedule = onSchedule({
     'fetched feed:', data.feedStart + '–' + data.feedEnd,
     'retained:', cov.ranges);
   if (!cov.covered) {
-    console.error('No retained feed covers today (' + denverToday() +
+    logger.error('No retained feed covers today (' + denverToday() +
       '). UTA is publishing only future service; the app will show a coverage-gap notice.');
+  }
+  } catch (e) {
+    logger.error('refreshSchedule failed: ' + (e && e.message || e));
+    throw e;
   }
 });
 
