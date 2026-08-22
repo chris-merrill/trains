@@ -58,10 +58,12 @@ html{-webkit-text-size-adjust:100%}
 body{
   background:var(--bg);color:var(--text);font-family:var(--font-ui);
   min-height:100vh;line-height:1.45;
+  /* Edge to edge on a phone: the board should use every pixel of the screen.
+     .8rem is the smallest gutter that still clears a rounded display corner. */
   padding:calc(env(safe-area-inset-top) + 1.25rem)
-          calc(env(safe-area-inset-right) + 1.25rem)
+          calc(env(safe-area-inset-right) + .8rem)
           calc(env(safe-area-inset-bottom) + 2rem)
-          calc(env(safe-area-inset-left) + 1.25rem);
+          calc(env(safe-area-inset-left) + .8rem);
   -webkit-tap-highlight-color:transparent;
 }
 button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
@@ -70,7 +72,11 @@ input{font:inherit;color:inherit}
 ::-webkit-scrollbar{width:4px;height:4px}
 ::-webkit-scrollbar-track{background:transparent}
 ::-webkit-scrollbar-thumb{background:var(--hairline);border-radius:2px}
-.wrap{max-width:40rem;margin:0 auto}
+/* No cap on phones or tablets — full viewport width, whatever the device.
+   Only a genuinely large desktop window gets a ceiling, so a 3rem departure
+   time isn't stranded in the middle of 2000px of cream. */
+.wrap{margin:0 auto}
+@media (min-width:64rem){.wrap{max-width:56rem}}
 .mono{font-family:var(--font-mono)}
 /* labels: the timetable-annotation voice used everywhere */
 .lbl{
@@ -307,7 +313,7 @@ header{margin-bottom:1.25rem}
 #sheetOverlay.open{display:block}
 #sheet{
   position:fixed;left:0;right:0;bottom:0;z-index:41;
-  max-width:40rem;margin:0 auto;max-height:72vh;display:flex;flex-direction:column;
+  max-width:56rem;margin:0 auto;max-height:72vh;display:flex;flex-direction:column;
   background:var(--surface);border:1px solid var(--hairline);border-bottom:0;
   border-radius:12px 12px 0 0;box-shadow:0 -8px 40px rgba(20,17,12,.18);
   padding-bottom:env(safe-area-inset-bottom);
