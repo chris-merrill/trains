@@ -1,9 +1,8 @@
-<!-- Source of truth for every app icon. The route-spine mark: a Green Line leg
-     rising into the transfer, a FrontRunner leg rising out of it, in UTA's own
-     published colors on the app's cream. Regenerate the PNGs with make-icons.sh. -->
+<!-- Apple touch icon: full bleed square, corners left square on purpose — iOS
+     applies its own squircle mask, and a pre-rounded icon double-rounds. -->
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
-  <rect width="512" height="512" rx="112" fill="#FBF7EC"/>
-  <g stroke-linecap="round" fill="none">
+  <rect width="512" height="512" fill="#FBF7EC"/>
+  <g transform="translate(256 256) scale(0.82) translate(-256 -256)" stroke-linecap="round" fill="none">
     <line x1="128" y1="384" x2="256" y2="256" stroke="#2EB566" stroke-width="34"/>
     <line x1="256" y1="256" x2="384" y2="128" stroke="#C227B9" stroke-width="34"/>
     <circle cx="128" cy="384" r="36" fill="#FBF7EC" stroke="#2EB566" stroke-width="26"/>

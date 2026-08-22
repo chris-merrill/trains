@@ -10,7 +10,8 @@
       "gtfs_raw/**",
       "gtfs.zip",
       "gtfs_data.json",
-      "icon.svg",
+      "icon*.svg",
+      "make-icons.sh",
       "timetable.html",
       "*.md"
     ],
