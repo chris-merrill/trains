@@ -129,7 +129,10 @@ header{margin-bottom:1.25rem}
 #weekendHint{display:none;color:var(--amber);font-style:italic}
 #weekendHint.show{display:inline}
 /* ---------------------------------------------------------------- controls */
-.controls{margin-bottom:1rem}
+/* Controls and the landed shortcut sit BELOW the board: the schedule is what
+   this app is for, and it has to be the first thing on screen on a small
+   phone — everything else is a second look. */
+.controls{margin-top:1rem}
 #controlsPill{
   width:100%;display:flex;align-items:center;justify-content:space-between;gap:.75rem;
   padding:.8rem 1rem;border:1px solid var(--hairline);border-radius:var(--r);
@@ -241,23 +244,24 @@ header{margin-bottom:1.25rem}
   font-family:var(--font-mono);font-size:.7rem;font-weight:600;letter-spacing:.1em;
   text-transform:uppercase;color:var(--text);
 }
-.hero-alts{font-family:var(--font-mono);font-size:.65rem;color:var(--faint);flex:1;min-width:12rem}
+.hero-alts{display:block;margin-top:.4rem;font-family:var(--font-mono);font-size:.65rem;line-height:1.5;color:var(--faint)}
 .hero-alts b{color:var(--muted);font-weight:500}
 /* ---------------------------------------------------------------- board: rows */
 .row{
-  width:100%;display:flex;align-items:baseline;gap:.75rem;
+  width:100%;display:flex;align-items:baseline;gap:.5rem;
   padding:.65rem .9rem;border:1px solid var(--hairline);border-radius:var(--r);
   background:var(--surface);font-family:var(--font-mono);font-size:.85rem;
 }
 .row--earlier{margin-bottom:.6rem}
 .row--later{margin-top:.6rem}
-.row .r-kind{font-size:.6rem;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--faint);width:3.6rem;flex-shrink:0}
-.row .r-dep{color:var(--text);font-variant-numeric:tabular-nums}
+.row .r-kind{font-size:.6rem;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--faint);width:3.2rem;flex-shrink:0}
+/* these are clock times — they must never break across two lines */
+.row .r-dep{color:var(--text);font-variant-numeric:tabular-nums;white-space:nowrap}
 .row .r-arrow{color:var(--faint)}
-.row .r-arr{color:var(--muted);font-variant-numeric:tabular-nums}
+.row .r-arr{color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
 .row .r-fill{flex:1}
-.row .r-total{font-size:.7rem;color:var(--faint);font-variant-numeric:tabular-nums}
-.row .r-in{font-size:.7rem;color:var(--faint);font-variant-numeric:tabular-nums;width:3.2rem;text-align:right}
+.row .r-total{font-size:.7rem;color:var(--faint);font-variant-numeric:tabular-nums;white-space:nowrap}
+.row .r-in{font-size:.7rem;color:var(--faint);font-variant-numeric:tabular-nums;width:3.2rem;text-align:right;white-space:nowrap}
 /* ---------------------------------------------------------------- notices */
 .notice{
   margin-bottom:.75rem;padding:.6rem .8rem;border-radius:var(--r);border:1px solid;
@@ -344,7 +348,7 @@ header{margin-bottom:1.25rem}
 }
 .hero-more:hover{color:var(--text)}
 /* --------------------------------------------------------------- quick actions */
-.quick{margin-bottom:1rem;display:none}
+.quick{margin-top:1rem;display:none}
 .quick.show{display:block}
 #landedBtn{
   width:100%;display:flex;align-items:center;justify-content:center;gap:.5rem;
@@ -446,6 +450,18 @@ header{margin-bottom:1.25rem}
     </div>
   </header>
 
+  <div id="offlineNote" class="notice notice--amber notice--row" hidden>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h.01"/><path d="M8.5 16.4a5 5 0 0 1 7 0"/><path d="M5 12.9a10 10 0 0 1 14 0"/><path d="M2 2l20 20"/></svg>
+    <span>No connection &mdash; showing the schedule saved on this device. These are UTA&rsquo;s published times; live delays resume when you&rsquo;re back online.</span>
+  </div>
+
+  <div id="board">
+    <div class="loading">
+      <svg class="spin" width="18" height="18" viewBox="0 0 24 24"><circle opacity=".25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"/><path opacity=".75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+      Loading&hellip;
+    </div>
+  </div>
+
   <div class="controls">
     <button id="controlsPill" type="button" aria-expanded="false">
       <span id="controlsSummary">&hellip;</span>
@@ -482,18 +498,6 @@ header{margin-bottom:1.25rem}
 
   <div class="quick" id="quickRow">
     <button id="landedBtn" type="button">&#9992;&#xFE0E; Just landed &mdash; plan from touchdown +15 min</button>
-  </div>
-
-  <div id="offlineNote" class="notice notice--amber notice--row" hidden>
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h.01"/><path d="M8.5 16.4a5 5 0 0 1 7 0"/><path d="M5 12.9a10 10 0 0 1 14 0"/><path d="M2 2l20 20"/></svg>
-    <span>No connection &mdash; showing the schedule saved on this device. These are UTA&rsquo;s published times; live delays resume when you&rsquo;re back online.</span>
-  </div>
-
-  <div id="board">
-    <div class="loading">
-      <svg class="spin" width="18" height="18" viewBox="0 0 24 24"><circle opacity=".25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"/><path opacity=".75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
-      Loading&hellip;
-    </div>
   </div>
 
   <div id="sheetOverlay">
@@ -906,6 +910,9 @@ header{margin-bottom:1.25rem}
       labelText='First departure';
       eyebrowCls+=' calm';
     }
+    // The date picker now sits below the board, so the board has to say for
+    // itself which day it is showing whenever that isn't today.
+    if(!ctx.isToday&&ctx.dateStr) labelText+=' · '+ctx.dateStr;
     card.appendChild(mkEl('div',eyebrowCls,[labelText]));
 
     // "4:09" big, "PM" small
@@ -960,15 +967,16 @@ header{margin-bottom:1.25rem}
     var more=mkEl('button','hero-more',['Full schedule \u203a']);
     more.type='button';
     more.addEventListener('click',openSheet);
-    // Earlier leg-1 options that also catch the same leg-2 train
-    if(ctx.alts&&ctx.alts.length){
-      var altTimes=ctx.alts.map(function(a){return minToDisplay(a.leg1Dep)}).join(', ');
-      var alts=mkEl('span','hero-alts',['Same '+L2.label+' \u00b7 earlier '+L1.label+': ']);
-      alts.appendChild(mkEl('b',null,[altTimes]));
-      foot.appendChild(alts);
-    }
     foot.appendChild(more);
     card.appendChild(foot);
+    // Earlier leg-1 options that also catch the same leg-2 train. Its own line:
+    // on a phone this runs long, and it must not crowd the total or the link.
+    if(ctx.alts&&ctx.alts.length){
+      var altTimes=ctx.alts.map(function(a){return minToDisplay(a.leg1Dep)}).join(', ');
+      var alts=mkEl('div','hero-alts',['Same '+L2.label+' \u00b7 earlier '+L1.label+': ']);
+      alts.appendChild(mkEl('b',null,[altTimes]));
+      card.appendChild(alts);
+    }
     return card;
   }
 
@@ -1088,7 +1096,8 @@ header{margin-bottom:1.25rem}
       return c.xferDep===primary.xferDep&&c.finalArr===primary.finalArr&&c.leg1Dep!==primary.leg1Dep;
     }).sort(function(a,b){return a.leg1Dep-b.leg1Dep});
 
-    var ctx={L1:L1,L2:L2,dir:dir,isToday:isToday,realNowMin:realNowMin,targetMin:targetMin,alts:alts};
+    var ctx={L1:L1,L2:L2,dir:dir,isToday:isToday,realNowMin:realNowMin,targetMin:targetMin,alts:alts,
+             dateStr:updateControlsPillDateStr(y,m,d)};
 
     // Build de-duplicated full timeline for neighbor navigation — same rule
     // as primary selection (keep latest leg1Dep per FR group, sort asc).
@@ -1116,7 +1125,11 @@ header{margin-bottom:1.25rem}
     SHEET_DATA={list:fullDedup,primary:primary,ctx:ctx,dateStr:updateControlsPillDateStr(y,m,d)};
     if(document.getElementById('sheetOverlay').classList.contains('open')) fillSheet();
 
-    if(earlier) board.appendChild(renderNeighborRow(earlier,ctx,'earlier'));
+    // Only keep the row above the hero when it is still catchable. On today's
+    // board that row is almost always a train that has already left, and a
+    // departed train is the last thing worth the space above the next one.
+    if(earlier&&!(isToday&&earlier.leg1Dep<realNowMin))
+      board.appendChild(renderNeighborRow(earlier,ctx,'earlier'));
     board.appendChild(renderHero(primary,ctx));
     if(later) board.appendChild(renderNeighborRow(later,ctx,'later'));
 
